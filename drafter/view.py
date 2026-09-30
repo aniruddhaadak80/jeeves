@@ -194,6 +194,15 @@ class DrafterView(nn.Module):
 
 
 def build_anchor_layout(L: int, block: int, n_blocks: int, gen: torch.Generator, device) -> tuple[torch.Tensor, torch.Tensor]:
+    # block 1 leaves arange(1, 1) empty, so there is no mask position to predict and kl_loss
+    # reshapes an empty tensor; a block at or past L makes the anchor count negative. Both used to
+    # reach torch as an opaque reshape or randperm error, or as a silent 0-sized layout.
+    if block < 2:
+        raise ValueError(f"block must be >= 2 to have a mask position to predict, got {block}")
+    if block > L:
+        raise ValueError(f"block {block} does not fit in a {L}-token row")
+    if n_blocks < 1:
+        raise ValueError(f"n_blocks must be >= 1, got {n_blocks}")
     n_blocks = min(n_blocks, L - block + 1)
     anchors = torch.randperm(L - block + 1, generator=gen)[:n_blocks].sort().values
     mask_pos = (anchors[:, None] + torch.arange(1, block, dtype=torch.long)[None, :]).reshape(-1)
