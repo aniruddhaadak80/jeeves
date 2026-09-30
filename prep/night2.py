@@ -69,6 +69,11 @@ def dates_records(pairs_per_family: int, seed: Any) -> list[dict[str, Any]]:
                     sent = relational_sentence(it)
                     it = {**it, "sentences": it["sentences"] + [(sent, {})]} if sent else it
                 req = to_request(it, family, pair_id, sibling, random.Random(order_seed))
+                # to_request hardcodes src to contrastive_{family}; these are the date families, so
+                # file the question under the record's own source the way unknowable_records does.
+                # (row_sha256 hashes the sentences, not the question, so this moves the label
+                # without touching the digest or the deterministic screen order.)
+                req["questions"]["decision"]["src"] = f"dates_{family}"
                 if style == "facts":
                     facts = date_facts(render(req["state"]))
                     if facts:
