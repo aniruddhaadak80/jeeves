@@ -11,7 +11,12 @@ from loader.dataloader import Encoder
 
 def load_streams(chain_cache: str, encoder: Encoder, limit: int = 0, seed: int = 0) -> list[list[int]]:
     streams = []
-    paths = sorted(p for pattern in chain_cache.split(",") for p in glob.glob(pattern))
+    patterns = [p for p in chain_cache.split(",") if p]
+    paths = sorted(p for pattern in patterns for p in glob.glob(pattern))
+    if not paths:
+        # A typo'd pattern, or shards not generated yet, would otherwise produce an empty pack and
+        # a training loop that spins at 100% CPU with nothing to show for it.
+        raise FileNotFoundError(f"no chain shards matched {patterns!r}")
     for path in paths:
         for line in open(path, encoding="utf-8"):
             if not line.strip():
@@ -32,6 +37,8 @@ def pack(streams: list[list[int]], length: int, sep: int) -> torch.Tensor:
         flat.extend(s)
         flat.append(sep)
     n = len(flat) // length
+    if n == 0:
+        raise ValueError(f"no complete {length}-token row in {len(flat)} packed tokens")
     return torch.tensor(flat[: n * length], dtype=torch.long).view(n, length)
 
 
